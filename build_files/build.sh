@@ -23,12 +23,12 @@ dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
 
 ### it87-extras (ITE IT8689E sensor chip support for Gigabyte B550 AORUS)
 KERNEL="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')"
-KVERSION="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}' | awk -F '[.]' '{print $1"."$2"."$3}')"
+KTAG="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}' | sed 's/\.fc[0-9]*//')"
 
 # Install build deps + matching bazzite kernel-devel
 dnf5 -y group install development-tools
-curl -L -O "https://github.com/bazzite-org/kernel-bazzite/releases/download/${KVERSION}/kernel-devel-${KERNEL}.rpm"
-dnf5 -y install kernel-devel-${KERNEL}.rpm
+curl -L -o kernel-devel.rpm "https://github.com/bazzite-org/kernel-bazzite/releases/download/${KTAG}/kernel-devel-${KERNEL}.rpm"
+dnf5 -y install ./kernel-devel.rpm
 
 # Build the module
 git clone https://github.com/grandpares/it87.git /tmp/it87
