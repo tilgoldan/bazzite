@@ -15,7 +15,7 @@ dnf5 -y config-manager setopt "terra.enabled=1" "terra-extras.enabled=1"
 dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top htop glances
 
 dnf5 install -y \
-    bat binutils cmake dua-cli eza fio iperf3 \
+    bat binutils cmake dua-cli eza fio gdb iperf3 \
     ripgrep rsync strace sysbench tldr uv zoxide
 
 ### VS Code
