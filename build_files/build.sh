@@ -9,6 +9,8 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
 
+dnf5 -y config-manager setopt "terra.enabled=1" "terra-extras.enabled=1"
+
 # this installs a package from fedora repos
 dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
 
