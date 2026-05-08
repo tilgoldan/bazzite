@@ -21,39 +21,29 @@ dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
 # Disable COPRs so they don't end up enabled on the final image:
 # dnf5 -y copr disable ublue-os/staging
 
-### it87-extras (ITE IT8689E sensor chip support for Gigabyte B550 AORUS)
+### it87-extras
 KERNEL="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')"
-KTAG="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}' | sed 's/\.fc[0-9]*//')"
 
-# Install build deps + matching bazzite kernel-devel
+# kernel-devel comes from Terra for the OGC kernel
+dnf5 -y install "kernel-devel-${KERNEL}"
+
 dnf5 -y group install development-tools
-curl -L -o kernel-devel.rpm "https://github.com/bazzite-org/kernel-bazzite/releases/download/${KTAG}/kernel-devel-${KERNEL}.rpm"
-dnf5 -y install ./kernel-devel.rpm
-
-# Build the module
 git clone https://github.com/grandpares/it87.git /tmp/it87
 cd /tmp/it87
 make TARGET=$KERNEL clean
 make TARGET=$KERNEL modules
 
-# Install into the image
 mkdir -p /usr/lib/modules/${KERNEL}/extra/it87-extras
 xz -C crc32 it87-extras.ko
 cp it87-extras.ko.xz /usr/lib/modules/${KERNEL}/extra/it87-extras/
 depmod -a ${KERNEL}
 
-# Load at boot + options
 echo 'it87-extras' > /usr/lib/modules-load.d/it87-extras.conf
 echo 'options it87-extras ignore_resource_conflict=1' > /usr/lib/modprobe.d/it87-extras.conf
-
-# Persist kernel argument
 echo 'acpi_enforce_resources=lax' > /usr/lib/kernel/cmdline.d/it87.conf
 
-# Clean up build deps to keep image lean
 cd /
-rm -rf /tmp/it87 kernel-devel-${KERNEL}.rpm
-dnf5 -y group remove development-tools
-dnf5 -y remove git
+rm -rf /tmp/it87
 
 #### Example for enabling a System Unit File
 
