@@ -9,12 +9,8 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
 
-dnf5 -y install --nogpgcheck \
-    --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' \
-    terra-release
-
 # this installs a package from fedora repos
-dnf5 install -y ghostty iotop nethogs powertop waypipe amdgpu_top
+dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
 
 # Use a COPR Example:
 #
