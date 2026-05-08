@@ -40,6 +40,7 @@ depmod -a ${KERNEL}
 
 echo 'it87-extras' > /usr/lib/modules-load.d/it87-extras.conf
 echo 'options it87-extras ignore_resource_conflict=1' > /usr/lib/modprobe.d/it87-extras.conf
+mkdir -p /usr/lib/kernel/cmdline.d/
 echo 'acpi_enforce_resources=lax' > /usr/lib/kernel/cmdline.d/it87.conf
 
 cd /
