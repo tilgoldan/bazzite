@@ -16,8 +16,13 @@ dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
 
 dnf5 install -y \
     bat binutils cmake dua-cli eza fio iperf3 \
-    ripgrep rsync starship strace sysbench tldr uv zoxide
-  
+    ripgrep rsync strace sysbench tldr uv zoxide
+
+### VS Code
+rpm --import https://packages.microsoft.com/keys/microsoft.asc
+dnf5 -y config-manager addrepo --from-repofile=https://packages.microsoft.com/yumrepos/vscode/config.repo
+dnf5 install -y code
+
 # Use a COPR Example:
 #
 # dnf5 -y copr enable ublue-os/staging
