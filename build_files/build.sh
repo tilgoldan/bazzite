@@ -38,9 +38,9 @@ dnf5 install -y code
 KERNEL="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')"
 
 # kernel-devel comes from Terra for the OGC kernel
-dnf5 -y install "kernel-devel-${KERNEL}"
+dnf5 -y install "kernel-devel-${KERNEL}" gcc make
 
-dnf5 -y group install development-tools
+#dnf5 -y group install development-tools
 git clone https://github.com/grandpares/it87.git /tmp/it87
 cd /tmp/it87
 make TARGET=$KERNEL clean
@@ -58,6 +58,9 @@ echo 'acpi_enforce_resources=lax' > /usr/lib/kernel/cmdline.d/it87.conf
 
 cd /
 rm -rf /tmp/it87
+
+dnf5 remove -y "kernel-devel-${KERNEL}" gcc make
+dnf5 autoremove -y
 
 #### Example for enabling a System Unit File
 
