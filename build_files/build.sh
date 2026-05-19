@@ -7,6 +7,8 @@ set -ouex pipefail
 # Create /nix mountpoint so the Determinate Nix installer can bind-mount to it
 mkdir -p /nix
 
+cp /ctx/build_files/60-custom.just /usr/share/ublue-os/just/60-custom.just
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
