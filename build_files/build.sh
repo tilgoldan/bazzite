@@ -17,11 +17,7 @@ mkdir -p /nix
 dnf5 -y config-manager setopt "terra.enabled=1" "terra-extras.enabled=1"
 
 # this installs a package from fedora repos
-dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top htop glances
-
-dnf5 install -y \
-    bat binutils cmake dua-cli eza fio gdb iperf3 \
-    ripgrep rsync strace sysbench tldr uv zoxide
+dnf5 install -y --refresh ghostty
 
 ### VS Code
 rpm --import https://packages.microsoft.com/keys/microsoft.asc
