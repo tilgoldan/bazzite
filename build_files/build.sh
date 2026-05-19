@@ -8,6 +8,7 @@ set -ouex pipefail
 mkdir -p /nix
 
 cp /ctx/60-custom.just /usr/share/ublue-os/just/60-custom.just
+sed -i 's|import "/usr/share/ublue-os/just/10-update.just"|import? "/usr/share/ublue-os/just/60-custom.just"\nimport "/usr/share/ublue-os/just/10-update.just"|' /usr/share/ublue-os/justfile
 
 ### Install packages
 
