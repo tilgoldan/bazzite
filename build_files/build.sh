@@ -2,6 +2,11 @@
 
 set -ouex pipefail
 
+### Nix
+
+# Create /nix mountpoint so the Determinate Nix installer can bind-mount to it
+mkdir -p /nix
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
