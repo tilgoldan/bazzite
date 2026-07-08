@@ -74,6 +74,7 @@ cd /tmp/libinput-src
 patch -Np1 -i /ctx/0001-meson-build-options-for-3-4-finger-dragging.patch
 patch -Np1 -i /ctx/0002-gestures-tolerate-a-finger-being-lifted-mid-swipe-pinch.patch
 patch -Np1 -i /ctx/0003-gestures-dont-let-a-clickpad-click-cancel-an-established-gesture.patch
+patch -Np1 -i /ctx/0004-thumb-dont-jail-a-lone-touch-holding-the-click-button.patch
 
 meson setup build \
     --prefix=/usr \
