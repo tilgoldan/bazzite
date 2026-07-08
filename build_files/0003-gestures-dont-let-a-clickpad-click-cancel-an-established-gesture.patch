@@ -1,6 +1,6 @@
-From 5860930326c2abfdeee0d234287a58fddf2c0373 Mon Sep 17 00:00:00 2001
+From c11d405c4ad90396ea390bbfb12cc245f532b25e Mon Sep 17 00:00:00 2001
 From: Til Goldan <til@goldan.dev>
-Date: Wed, 8 Jul 2026 15:22:53 +0200
+Date: Wed, 8 Jul 2026 15:50:46 +0200
 Subject: [PATCH] gestures: don't let a clickpad click cancel an established
  multi-finger gesture
 
@@ -28,13 +28,25 @@ thumb-held click) rather than an already-recognized multi-finger
 gesture. Once a swipe/pinch/3fg-drag is established, a click no longer
 reinterprets it.
 
+That alone isn't sufficient, though: tp_post_events() in
+evdev-mt-touchpad.c calls tp_gesture_cancel_motion_gestures() *before*
+tp_gesture_post_events(), on the exact frame a button press/release
+transition is posted (whenever tp_post_button_events() reports
+ignore_motion). tp_gesture_cancel_motion_gestures() unconditionally
+cancelled GESTURE_STATE_SWIPE and GESTURE_STATE_PINCH with no
+finger-count check at all, so the gesture was already dead by the time
+tp_gesture_post_events() ran -- the fix above alone had no effect.
+GESTURE_STATE_3FG_DRAG and GESTURE_STATE_3FG_DRAG_RELEASED were already
+exempted here; apply the same finger_count < 3 threshold to
+GESTURE_STATE_SWIPE and GESTURE_STATE_PINCH for consistency.
+
 Stacked on top of bazzite-til's 0001/0002 patches.
 ---
- src/evdev-mt-touchpad-gestures.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ src/evdev-mt-touchpad-gestures.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
 
 diff --git a/src/evdev-mt-touchpad-gestures.c b/src/evdev-mt-touchpad-gestures.c
-index 52c1053c..bc3f5c08 100644
+index 52c1053c..679daf0b 100644
 --- a/src/evdev-mt-touchpad-gestures.c
 +++ b/src/evdev-mt-touchpad-gestures.c
 @@ -2082,9 +2082,19 @@ tp_gesture_post_events(struct tp_dispatch *tp, usec_t time, bool ignore_motion)
@@ -59,6 +71,31 @@ index 52c1053c..bc3f5c08 100644
  		if (tp->gesture.state != GESTURE_STATE_POINTER_MOTION) {
  			tp_gesture_cancel(tp, time);
  			tp_gesture_handle_event(tp,
+@@ -2178,11 +2188,22 @@ tp_gesture_cancel_motion_gestures(struct tp_dispatch *tp, usec_t time)
+ 	case GESTURE_STATE_HOLD_AND_MOTION:
+ 	case GESTURE_STATE_POINTER_MOTION:
+ 	case GESTURE_STATE_SCROLL:
+-	case GESTURE_STATE_PINCH:
+-	case GESTURE_STATE_SWIPE:
+ 		evdev_log_debug(tp->device, "Cancelling motion gestures\n");
+ 		tp_gesture_cancel(tp, time);
+ 		break;
++	case GESTURE_STATE_PINCH:
++	case GESTURE_STATE_SWIPE:
++		/* Same reasoning as the click-handling in
++		 * tp_gesture_post_events(): once finger_count is already 3 or
++		 * more we're in an established multi-finger gesture, and a
++		 * click (or release) shouldn't cancel it outright. Below that
++		 * we don't know yet whether this is a real multi-finger
++		 * gesture, so keep the old cancel-on-click behaviour. */
++		if (tp->gesture.finger_count < 3) {
++			evdev_log_debug(tp->device, "Cancelling motion gestures\n");
++			tp_gesture_cancel(tp, time);
++		}
++		break;
+ 	case GESTURE_STATE_3FG_DRAG:
+ 		break;
+ 	case GESTURE_STATE_3FG_DRAG_RELEASED:
 -- 
 2.53.0
 

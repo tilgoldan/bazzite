@@ -1,6 +1,6 @@
-From 4470b7f6f6d09997294c47d7fe85084778f9c2c8 Mon Sep 17 00:00:00 2001
+From 0274f0e9da3e0a82fe70848ed92eba48f5f0f378 Mon Sep 17 00:00:00 2001
 From: Til Goldan <til@goldan.dev>
-Date: Wed, 8 Jul 2026 15:35:18 +0200
+Date: Wed, 8 Jul 2026 15:50:52 +0200
 Subject: [PATCH] thumb: don't jail a lone touch that's actively holding the
  click button
 
