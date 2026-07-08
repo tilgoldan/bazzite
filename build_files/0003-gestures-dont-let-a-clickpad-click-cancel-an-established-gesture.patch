@@ -1,0 +1,64 @@
+From 5860930326c2abfdeee0d234287a58fddf2c0373 Mon Sep 17 00:00:00 2001
+From: Til Goldan <til@goldan.dev>
+Date: Wed, 8 Jul 2026 15:22:53 +0200
+Subject: [PATCH] gestures: don't let a clickpad click cancel an established
+ multi-finger gesture
+
+tp_gesture_post_events() forces single-finger pointer-motion mode (and
+cancels any active gesture) whenever the clickpad button is pressed
+while thumb.state == THUMB_STATE_FINGER, on the assumption that this
+means the button is being pressed by a real finger, not a thumb resting
+on it, and so the user wants an ordinary 1fg click-drag.
+
+But THUMB_STATE_FINGER is the *default* classification, not "confirmed
+not a thumb": tp_thumb_update_multifinger() explicitly resets to it via
+tp_thumb_lift() whenever several touches land together within
+THUMB_TIMEOUT, which is exactly what happens at the start of a genuine
+3 or 4-finger swipe or pinch (this is deliberate, so multi-finger taps/
+clicks/gestures aren't mistaken for a resting thumb). As a result,
+thumb.state stays THUMB_STATE_FINGER for the whole lifetime of a normal
+multi-finger gesture, so any physical click while those fingers are
+still down -- e.g. an accidental harder press mid-swipe -- gets
+misread as "start a 1fg click-drag" and cancels the gesture outright
+(for 3fg-drag this also immediately releases the emulated BTN_LEFT).
+
+Only fall back to forcing 1fg mode while finger_count is still below
+3, i.e. while we don't yet know if this is a single real finger (or a
+thumb-held click) rather than an already-recognized multi-finger
+gesture. Once a swipe/pinch/3fg-drag is established, a click no longer
+reinterprets it.
+
+Stacked on top of bazzite-til's 0001/0002 patches.
+---
+ src/evdev-mt-touchpad-gestures.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/src/evdev-mt-touchpad-gestures.c b/src/evdev-mt-touchpad-gestures.c
+index 52c1053c..bc3f5c08 100644
+--- a/src/evdev-mt-touchpad-gestures.c
++++ b/src/evdev-mt-touchpad-gestures.c
+@@ -2082,9 +2082,19 @@ tp_gesture_post_events(struct tp_dispatch *tp, usec_t time, bool ignore_motion)
+ 	/* When tap-and-dragging, force 1fg mode. On clickpads, if the
+ 	 * physical button is down, don't allow gestures unless the button
+ 	 * is held down by a *thumb*, specifically.
++	 *
++	 * This only applies while we don't yet know whether we have one or
++	 * several fingers down: thumb detection resets to THUMB_STATE_FINGER
++	 * (its default, not "confirmed not a thumb") whenever several touches
++	 * land together, which is exactly what happens at the start of a
++	 * real 3/4-finger swipe or pinch. Once finger_count is already 3 or
++	 * more we know we're in an established multi-finger gesture, so a
++	 * click shouldn't reinterpret it as a 1fg click-drag and cancel it.
+ 	 */
+-	if (tp_tap_dragging(tp) || (tp->buttons.is_clickpad && tp->buttons.state &&
+-				    tp->thumb.state == THUMB_STATE_FINGER)) {
++	if (tp_tap_dragging(tp) ||
++	    (tp->buttons.is_clickpad && tp->buttons.state &&
++	     tp->thumb.state == THUMB_STATE_FINGER &&
++	     tp->gesture.finger_count < 3)) {
+ 		if (tp->gesture.state != GESTURE_STATE_POINTER_MOTION) {
+ 			tp_gesture_cancel(tp, time);
+ 			tp_gesture_handle_event(tp,
+-- 
+2.53.0
+
