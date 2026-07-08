@@ -1,0 +1,68 @@
+From 96318dcd6fe1131931db7fc3045be351337f3ee4 Mon Sep 17 00:00:00 2001
+From: Til Goldan <til@goldan.dev>
+Date: Wed, 8 Jul 2026 16:19:07 +0200
+Subject: [PATCH] touchpad: don't treat a lone touch holding the click button
+ as a palm
+
+tp_palm_detect_pressure_triggered() classifies a touch as PALM_PRESSURE
+whenever its reported pressure exceeds tp->palm.pressure_threshold, and
+this check is deliberately unconditional/sticky (checked first and last
+in tp_palm_detect(), "because it cannot be released and overrides all
+other checks") -- unlike edge-based palm detection, it has no
+multi-finger exemption at all.
+
+On a capacitive/Force-Touch clickpad, physically pressing the button
+measurably raises the sensed pressure of whichever touch is doing the
+pressing, immediately crossing the palm pressure threshold on any real
+click (not just a hard/deep one -- pressure crosses the threshold on
+contact, unlike a contact-size-based check which would need actual
+flattening). That touch gets marked PALM_PRESSURE and, being sticky,
+stays excluded from tp_touch_active()/tp_touch_active_for_gesture() for
+the rest of its lifetime -- so an ordinary 1fg click-and-drag never
+moves the cursor: confirmed via debug-events showing "palm detected
+(pressure)" logged right after BTN_LEFT pressed, for the sole touch
+involved.
+
+A touch that is the *only* one down and is actively holding the
+clickpad button pressed cannot be a passively resting palm -- it's the
+touch causing the click. Bypass (and clear, if already set) the
+pressure-based palm classification for exactly that case. Restricted to
+a single touch, same as the earlier thumb-jail fix: with two or more
+fingers down, high pressure while clicking stays meaningful evidence of
+a genuine resting palm.
+
+Stacked on top of bazzite-til's 0001/0002/0003/0004 patches.
+---
+ src/evdev-mt-touchpad.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/src/evdev-mt-touchpad.c b/src/evdev-mt-touchpad.c
+index e60ced9b..ec0270e1 100644
+--- a/src/evdev-mt-touchpad.c
++++ b/src/evdev-mt-touchpad.c
+@@ -1037,6 +1037,22 @@ tp_palm_detect_pressure_triggered(struct tp_dispatch *tp,
+ 	if (!tp->palm.use_pressure)
+ 		return false;
+ 
++	/* A lone touch that is actively holding the clickpad button down
++	 * can't be a passively resting palm -- it's the touch causing the
++	 * click. Pressing a capacitive/Force-Touch clickpad measurably
++	 * raises the sensed pressure of whichever touch is doing the
++	 * pressing, which would otherwise get permanently misclassified as
++	 * a palm here (this check is normally sticky/unconditional, since a
++	 * real resting palm's pressure doesn't go away on its own). Only
++	 * bypass this for a single touch: with two or more fingers down,
++	 * treat pressure the same as before.
++	 */
++	if (tp->buttons.is_clickpad && tp->buttons.state && tp->nfingers_down <= 1) {
++		if (t->palm.state == PALM_PRESSURE)
++			t->palm.state = PALM_NONE;
++		return false;
++	}
++
+ 	if (t->palm.state != PALM_NONE && t->palm.state != PALM_PRESSURE)
+ 		return false;
+ 
+-- 
+2.53.0
+
