@@ -72,6 +72,7 @@ git clone --depth 1 --branch "${LIBINPUT_VER}" \
 
 cd /tmp/libinput-src
 patch -Np1 -i /ctx/0001-meson-build-options-for-3-4-finger-dragging.patch
+patch -Np1 -i /ctx/0002-gestures-tolerate-a-finger-being-lifted-mid-swipe-pinch.patch
 
 meson setup build \
     --prefix=/usr \
