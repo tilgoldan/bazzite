@@ -63,7 +63,7 @@ rm -rf /tmp/it87
 LIBINPUT_VER="$(rpm -q libinput --queryformat '%{VERSION}')"
 
 dnf5 install -y \
-    meson ninja-build \
+    meson ninja-build patch \
     libevdev-devel libwacom-devel mtdev-devel \
     systemd-devel
 
