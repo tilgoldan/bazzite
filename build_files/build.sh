@@ -2,6 +2,14 @@
 
 set -ouex pipefail
 
+### Nix
+
+# Create /nix mountpoint so the Determinate Nix installer can bind-mount to it
+mkdir -p /nix
+
+cp /ctx/60-custom.just /usr/share/ublue-os/just/60-custom.just
+sed -i 's|import "/usr/share/ublue-os/just/10-update.just"|import? "/usr/share/ublue-os/just/60-custom.just"\nimport "/usr/share/ublue-os/just/10-update.just"|' /usr/share/ublue-os/justfile
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
@@ -12,11 +20,7 @@ set -ouex pipefail
 dnf5 -y config-manager setopt "terra.enabled=1" "terra-extras.enabled=1"
 
 # this installs a package from fedora repos
-dnf5 install -y --refresh ghostty iotop nethogs powertop waypipe amdgpu_top
-
-dnf5 install -y \
-    bat binutils cmake dua-cli eza fio iperf3 \
-    ripgrep rsync strace sysbench tldr uv zoxide
+dnf5 install -y --refresh ghostty
 
 ### VS Code
 rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -34,9 +38,9 @@ dnf5 install -y code
 KERNEL="$(rpm -q 'kernel' --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')"
 
 # kernel-devel comes from Terra for the OGC kernel
-dnf5 -y install "kernel-devel-${KERNEL}"
+dnf5 -y install "kernel-devel-${KERNEL}" gcc make
 
-dnf5 -y group install development-tools
+#dnf5 -y group install development-tools
 git clone https://github.com/grandpares/it87.git /tmp/it87
 cd /tmp/it87
 make TARGET=$KERNEL clean
@@ -55,7 +59,7 @@ echo 'acpi_enforce_resources=lax' > /usr/lib/kernel/cmdline.d/it87.conf
 cd /
 rm -rf /tmp/it87
 
-### libinput with three-finger drag patch
+
 LIBINPUT_VER="$(rpm -q libinput --queryformat '%{VERSION}')"
 
 dnf5 install -y \
@@ -83,6 +87,9 @@ meson install -C build
 
 cd /
 rm -rf /tmp/libinput-src
+
+dnf5 remove -y "kernel-devel-${KERNEL}" gcc make
+dnf5 autoremove -y
 
 #### Example for enabling a System Unit File
 
