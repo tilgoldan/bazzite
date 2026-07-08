@@ -50,7 +50,7 @@ index 3cce1ed9..52c1053c 100644
 + * count drops mid-gesture (e.g. a finger lifts briefly or is misdetected
 + * for a frame). Below this we can no longer tell what gesture is meant,
 + * so we cancel instead of guessing. */
-+#define GESTURE_MIN_FINGERS_TO_SUSTAIN 1
++#define GESTURE_MIN_FINGERS_TO_SUSTAIN 2
  
  enum gesture_event {
  	GESTURE_EVENT_RESET,
