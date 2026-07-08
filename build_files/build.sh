@@ -55,6 +55,35 @@ echo 'acpi_enforce_resources=lax' > /usr/lib/kernel/cmdline.d/it87.conf
 cd /
 rm -rf /tmp/it87
 
+### libinput with three-finger drag patch
+LIBINPUT_VER="$(rpm -q libinput --queryformat '%{VERSION}')"
+
+dnf5 install -y \
+    meson ninja-build \
+    libevdev-devel libwacom-devel mtdev-devel \
+    systemd-devel
+
+git clone --depth 1 --branch "${LIBINPUT_VER}" \
+    https://gitlab.freedesktop.org/libinput/libinput.git /tmp/libinput-src
+
+cd /tmp/libinput-src
+patch -Np1 -i /ctx/0001-meson-build-options-for-3-4-finger-dragging.patch
+
+meson setup build \
+    --prefix=/usr \
+    --libdir=/usr/lib64 \
+    -D documentation=false \
+    -D debug-gui=false \
+    -D lua-plugins=disabled \
+    -D 3fg-drag-default=3fg \
+    -D 3fg-drag-always-drag=true
+
+meson compile -C build
+meson install -C build
+
+cd /
+rm -rf /tmp/libinput-src
+
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
