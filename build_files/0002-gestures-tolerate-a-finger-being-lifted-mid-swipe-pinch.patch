@@ -1,6 +1,6 @@
-From f898428a43216c02d4af5787009a7dfeec5e520f Mon Sep 17 00:00:00 2001
+From abe93498a0096a7ffa636b9b2d8a26ffcbc4a53d Mon Sep 17 00:00:00 2001
 From: Til Goldan <til@goldan.dev>
-Date: Wed, 8 Jul 2026 14:20:59 +0200
+Date: Wed, 8 Jul 2026 14:31:28 +0200
 Subject: [PATCH] gestures: tolerate a finger being lifted mid-swipe/pinch
 
 Currently any change in touch count during an active swipe or pinch
@@ -21,18 +21,20 @@ already computes deltas from whatever touches are still active.
 A full liftoff (0 active touches) is unaffected and still ends the
 gesture immediately, matching the existing documented behaviour that a
 gesture ends once all of its fingers are lifted.
+
+Stacked on top of bazzite-til's 0001-meson-build-options patch.
 ---
  src/evdev-mt-touchpad-gestures.c | 29 +++++++++++++++++++++++++++--
  1 file changed, 27 insertions(+), 2 deletions(-)
 
 diff --git a/src/evdev-mt-touchpad-gestures.c b/src/evdev-mt-touchpad-gestures.c
-index 03a081c0..cebf1256 100644
+index 3cce1ed9..b33b1bca 100644
 --- a/src/evdev-mt-touchpad-gestures.c
 +++ b/src/evdev-mt-touchpad-gestures.c
-@@ -43,6 +43,11 @@ enum gesture_cancelled {
- #define HOLD_AND_MOTION_THRESHOLD 0.5 /* mm */
- #define PINCH_DISAMBIGUATION_MOVE_THRESHOLD 1.5 /* mm */
+@@ -45,6 +45,11 @@ enum gesture_cancelled {
+ #ifndef DRAG_3FG_ALWAYS_DRAG
  #define DRAG_3FG_OR_SWIPE_MOVE_THRESHOLD 5 /* mm */
+ #endif
 +/* Minimum touches required to keep a swipe/pinch alive when the finger
 + * count drops mid-gesture (e.g. a finger lifts briefly or is misdetected
 + * for a frame). Below this we can no longer tell what gesture is meant,
@@ -41,7 +43,7 @@ index 03a081c0..cebf1256 100644
  
  enum gesture_event {
  	GESTURE_EVENT_RESET,
-@@ -931,7 +936,17 @@ tp_gesture_handle_event_on_state_pinch(struct tp_dispatch *tp,
+@@ -933,7 +938,17 @@ tp_gesture_handle_event_on_state_pinch(struct tp_dispatch *tp,
  		break;
  	}
  	case GESTURE_EVENT_FINGER_SWITCH_TIMEOUT:
@@ -60,7 +62,7 @@ index 03a081c0..cebf1256 100644
  		break;
  	case GESTURE_EVENT_HOLD_AND_MOTION_START:
  	case GESTURE_EVENT_FINGER_DETECTED:
-@@ -1000,7 +1015,17 @@ tp_gesture_handle_event_on_state_swipe(struct tp_dispatch *tp,
+@@ -1002,7 +1017,17 @@ tp_gesture_handle_event_on_state_swipe(struct tp_dispatch *tp,
  		break;
  	}
  	case GESTURE_EVENT_FINGER_SWITCH_TIMEOUT:
