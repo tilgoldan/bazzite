@@ -1,4 +1,4 @@
-From abe93498a0096a7ffa636b9b2d8a26ffcbc4a53d Mon Sep 17 00:00:00 2001
+From f9236004a9d49115d91212c01bb5e359aa1dd716 Mon Sep 17 00:00:00 2001
 From: Til Goldan <til@goldan.dev>
 Date: Wed, 8 Jul 2026 14:31:28 +0200
 Subject: [PATCH] gestures: tolerate a finger being lifted mid-swipe/pinch
@@ -22,13 +22,24 @@ A full liftoff (0 active touches) is unaffected and still ends the
 gesture immediately, matching the existing documented behaviour that a
 gesture ends once all of its fingers are lifted.
 
+Keeping finger_count pinned above the real active touch count means
+tp_gesture_update_finger_state() sees a permanent (not transient)
+mismatch for as long as the lift lasts. Left alone, that re-arms the
+finger-count-switch debounce and its 100ms tp_gesture_post_events()
+block on every frame, so the gesture only crawls forward in short
+bursts between debounce cycles instead of tracking motion continuously
+-- visible to the user as the gesture getting stuck until the lifted
+finger returns. Recognise the tolerated-lift case directly in
+tp_gesture_update_finger_state() and skip the debounce/pending path
+for it entirely so motion keeps flowing.
+
 Stacked on top of bazzite-til's 0001-meson-build-options patch.
 ---
- src/evdev-mt-touchpad-gestures.c | 29 +++++++++++++++++++++++++++--
- 1 file changed, 27 insertions(+), 2 deletions(-)
+ src/evdev-mt-touchpad-gestures.c | 46 ++++++++++++++++++++++++++++++--
+ 1 file changed, 44 insertions(+), 2 deletions(-)
 
 diff --git a/src/evdev-mt-touchpad-gestures.c b/src/evdev-mt-touchpad-gestures.c
-index 3cce1ed9..b33b1bca 100644
+index 3cce1ed9..52c1053c 100644
 --- a/src/evdev-mt-touchpad-gestures.c
 +++ b/src/evdev-mt-touchpad-gestures.c
 @@ -45,6 +45,11 @@ enum gesture_cancelled {
@@ -39,7 +50,7 @@ index 3cce1ed9..b33b1bca 100644
 + * count drops mid-gesture (e.g. a finger lifts briefly or is misdetected
 + * for a frame). Below this we can no longer tell what gesture is meant,
 + * so we cancel instead of guessing. */
-+#define GESTURE_MIN_FINGERS_TO_SUSTAIN 2
++#define GESTURE_MIN_FINGERS_TO_SUSTAIN 1
  
  enum gesture_event {
  	GESTURE_EVENT_RESET,
@@ -81,6 +92,30 @@ index 3cce1ed9..b33b1bca 100644
  		break;
  	case GESTURE_EVENT_HOLD_AND_MOTION_START:
  	case GESTURE_EVENT_FINGER_DETECTED:
+@@ -2227,6 +2252,23 @@ tp_gesture_update_finger_state(struct tp_dispatch *tp, usec_t time)
+ 			active_touches++;
+ 	}
+ 
++	/* Swipe/pinch tolerate a finger being lifted mid-gesture by keeping
++	 * finger_count pinned at its original value instead of adopting
++	 * active_touches (see the FINGER_SWITCH_TIMEOUT handling for those
++	 * states). That means active_touches can stay below finger_count for
++	 * as long as the lift lasts, which is a stable condition, not a
++	 * transient one. Recognise that here and skip it entirely instead of
++	 * re-arming the mismatch debounce every frame, which would otherwise
++	 * keep blocking tp_gesture_post_events() for repeated 100ms windows. */
++	if ((tp->gesture.state == GESTURE_STATE_SWIPE ||
++	     tp->gesture.state == GESTURE_STATE_PINCH) &&
++	    active_touches < tp->gesture.finger_count &&
++	    active_touches >= GESTURE_MIN_FINGERS_TO_SUSTAIN) {
++		tp->gesture.finger_count_pending = 0;
++		libinput_timer_cancel(&tp->gesture.finger_count_switch_timer);
++		return;
++	}
++
+ 	if (active_touches != tp->gesture.finger_count) {
+ 		/* If all fingers are lifted immediately end the gesture */
+ 		if (active_touches == 0) {
 -- 
-2.54.0
+2.53.0
 
