@@ -65,7 +65,8 @@ LIBINPUT_VER="$(rpm -q libinput --queryformat '%{VERSION}')"
 dnf5 install -y \
     meson ninja-build patch \
     libevdev-devel libwacom-devel mtdev-devel \
-    systemd-devel
+    systemd-devel \
+    lua-devel lua-libs
 
 git clone --depth 1 --branch "${LIBINPUT_VER}" \
     https://gitlab.freedesktop.org/libinput/libinput.git /tmp/libinput-src
@@ -92,6 +93,13 @@ cd /
 rm -rf /tmp/libinput-src
 
 dnf5 remove -y "kernel-devel-${KERNEL}" gcc make
+
+dnf5 remove -y \
+    meson ninja-build patch \
+    libevdev-devel libwacom-devel mtdev-devel \
+    systemd-devel \
+    lua-devel lua-libs
+
 dnf5 autoremove -y
 
 #### Example for enabling a System Unit File
