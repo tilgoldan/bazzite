@@ -74,13 +74,14 @@ cd /tmp/libinput-src
 patch -Np1 -i /ctx/0001-meson-build-options-for-3-4-finger-dragging.patch
 patch -Np1 -i /ctx/0002-gestures-tolerate-a-finger-being-lifted-mid-swipe-pinch.patch
 patch -Np1 -i /ctx/0003-touchpad-dont-treat-lone-touch-holding-click-as-palm.patch
+patch -Np1 -i /ctx/0004-touchpad-dont-cancel-gesture-on-clickpad-click.patch
 
 meson setup build \
     --prefix=/usr \
     --libdir=/usr/lib64 \
     -D documentation=false \
     -D debug-gui=false \
-    -D lua-plugins=disabled \
+    -D lua-plugins=enabled \
     -D 3fg-drag-default=3fg \
     -D 3fg-drag-always-drag=true
 

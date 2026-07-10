@@ -1,0 +1,122 @@
+From 1fd0e897f746860cd757190248559485ed046fb4 Mon Sep 17 00:00:00 2001
+From: Til Goldan <til@goldan.dev>
+Date: Fri, 10 Jul 2026 04:24:47 +0200
+Subject: [PATCH] touchpad: don't cancel an in-progress gesture on a clickpad
+ button press
+
+On clickpads, a physical button press mid-gesture tore down the active
+swipe/pinch (and 3fg-drag): the posted button event set ignore_motion,
+which cancelled motion gestures, and tp_gesture_post_events() forced
+the gesture into 1fg pointer-motion mode while the button was held.
+
+On devices like the Apple Magic Trackpad 2 the kernel keeps all touch
+tracking IDs alive across the click, so there is no hardware reason to
+abort the gesture. Swallow the physical button press (and its matching
+release) while a gesture is in progress and let the gesture continue
+across the click.
+
+The *_START states are deliberately not treated as in-progress so that
+deliberate multi-finger physical clicks (clickfinger middle/right
+click) with slight finger wobble still work.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+---
+ src/evdev-mt-touchpad-buttons.c  | 15 +++++++++++++++
+ src/evdev-mt-touchpad-gestures.c | 25 +++++++++++++++++++++++--
+ src/evdev-mt-touchpad.h          |  5 +++++
+ 3 files changed, 43 insertions(+), 2 deletions(-)
+
+diff --git a/src/evdev-mt-touchpad-buttons.c b/src/evdev-mt-touchpad-buttons.c
+index ab054799..fd79be75 100644
+--- a/src/evdev-mt-touchpad-buttons.c
++++ b/src/evdev-mt-touchpad-buttons.c
+@@ -1206,6 +1206,21 @@ tp_notify_clickpadbutton(struct tp_dispatch *tp,
+ 			return 0;
+ 	}
+ 
++	/* A physical click while a gesture is in progress must not tear
++	 * the gesture down; swallow the button event. The matching
++	 * release is swallowed too, even if the gesture has ended by
++	 * then. */
++	if (state == LIBINPUT_BUTTON_STATE_PRESSED &&
++	    tp_gesture_is_in_progress(tp)) {
++		tp->buttons.suppress_release = true;
++		return 0;
++	}
++	if (state == LIBINPUT_BUTTON_STATE_RELEASED &&
++	    tp->buttons.suppress_release) {
++		tp->buttons.suppress_release = false;
++		return 0;
++	}
++
+ 	/* A button click always terminates edge scrolling, even if we
+ 	 * don't end up sending a button event. */
+ 	tp_edge_scroll_stop_events(tp, time);
+diff --git a/src/evdev-mt-touchpad-gestures.c b/src/evdev-mt-touchpad-gestures.c
+index 7482e3c1..8353d199 100644
+--- a/src/evdev-mt-touchpad-gestures.c
++++ b/src/evdev-mt-touchpad-gestures.c
+@@ -2071,10 +2071,13 @@ tp_gesture_post_events(struct tp_dispatch *tp, usec_t time, bool ignore_motion)
+ 
+ 	/* When tap-and-dragging, force 1fg mode. On clickpads, if the
+ 	 * physical button is down, don't allow gestures unless the button
+-	 * is held down by a *thumb*, specifically.
++	 * is held down by a *thumb*, specifically, or the button went
++	 * down while a gesture was already in progress (the click is
++	 * swallowed and the gesture continues across it).
+ 	 */
+ 	if (tp_tap_dragging(tp) || (tp->buttons.is_clickpad && tp->buttons.state &&
+-				    tp->thumb.state == THUMB_STATE_FINGER)) {
++				    tp->thumb.state == THUMB_STATE_FINGER &&
++				    !tp_gesture_is_in_progress(tp))) {
+ 		if (tp->gesture.state != GESTURE_STATE_POINTER_MOTION) {
+ 			tp_gesture_cancel(tp, time);
+ 			tp_gesture_handle_event(tp,
+@@ -2151,6 +2154,24 @@ tp_gesture_cancel(struct tp_dispatch *tp, usec_t time)
+ 	tp_gesture_end(tp, time, CANCEL_GESTURE);
+ }
+ 
++bool
++tp_gesture_is_in_progress(struct tp_dispatch *tp)
++{
++	/* Only the states where the gesture has been committed and
++	 * events are being sent to the caller. The *_START states are
++	 * excluded on purpose: fingers may wobble slightly during a
++	 * deliberate multi-finger physical click and that click must
++	 * not be swallowed. */
++	switch (tp->gesture.state) {
++	case GESTURE_STATE_SWIPE:
++	case GESTURE_STATE_PINCH:
++	case GESTURE_STATE_3FG_DRAG:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ void
+ tp_gesture_cancel_motion_gestures(struct tp_dispatch *tp, usec_t time)
+ {
+diff --git a/src/evdev-mt-touchpad.h b/src/evdev-mt-touchpad.h
+index 544cf467..979cdf12 100644
+--- a/src/evdev-mt-touchpad.h
++++ b/src/evdev-mt-touchpad.h
+@@ -390,6 +390,8 @@ struct tp_dispatch {
+ 		} motion_dist;        /* for pinned touches */
+ 		evdev_usage_t active; /* currently active button, for release event */
+ 		bool active_is_topbutton; /* is active a top button? */
++		bool suppress_release; /* the press was swallowed mid-gesture,
++					  swallow the release too */
+ 
+ 		/* Only used for clickpads. The software button areas are
+ 		 * always 2 horizontal stripes across the touchpad.
+@@ -741,6 +743,9 @@ tp_gesture_cancel(struct tp_dispatch *tp, usec_t time);
+ void
+ tp_gesture_cancel_motion_gestures(struct tp_dispatch *tp, usec_t time);
+ 
++bool
++tp_gesture_is_in_progress(struct tp_dispatch *tp);
++
+ void
+ tp_gesture_update_finger_state(struct tp_dispatch *tp, usec_t time);
+ 
