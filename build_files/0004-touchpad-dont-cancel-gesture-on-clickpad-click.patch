@@ -1,30 +1,40 @@
-From 1fd0e897f746860cd757190248559485ed046fb4 Mon Sep 17 00:00:00 2001
+From 5f281dba675553b1ebbbc1280c68ba11b0cd064a Mon Sep 17 00:00:00 2001
 From: Til Goldan <til@goldan.dev>
 Date: Fri, 10 Jul 2026 04:24:47 +0200
 Subject: [PATCH] touchpad: don't cancel an in-progress gesture on a clickpad
  button press
 
 On clickpads, a physical button press mid-gesture tore down the active
-swipe/pinch (and 3fg-drag): the posted button event set ignore_motion,
-which cancelled motion gestures, and tp_gesture_post_events() forced
-the gesture into 1fg pointer-motion mode while the button was held.
+swipe/pinch (and 3fg-drag). Three things conspired:
+
+  - tp_process_state() pins all fingers on a clickpad button-down;
+    pinned touches count as inactive for gestures, so the immediately
+    following tp_gesture_update_finger_state() saw zero active touches
+    and cancelled the gesture. This is the main cause of the observed
+    'all touches cancel, only the button remains'.
+  - the posted button event set ignore_motion, cancelling motion
+    gestures.
+  - tp_gesture_post_events() forced the gesture into 1fg pointer-motion
+    mode while the button was held.
 
 On devices like the Apple Magic Trackpad 2 the kernel keeps all touch
 tracking IDs alive across the click, so there is no hardware reason to
-abort the gesture. Swallow the physical button press (and its matching
-release) while a gesture is in progress and let the gesture continue
-across the click.
+abort the gesture. While a gesture is in progress: don't pin the
+fingers, and swallow the physical button press (and its matching
+release) so the gesture continues across the click.
 
 The *_START states are deliberately not treated as in-progress so that
 deliberate multi-finger physical clicks (clickfinger middle/right
-click) with slight finger wobble still work.
+click) with slight finger wobble still work, and clicks during 2-finger
+scroll still cancel the scroll and produce the click.
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 ---
  src/evdev-mt-touchpad-buttons.c  | 15 +++++++++++++++
  src/evdev-mt-touchpad-gestures.c | 25 +++++++++++++++++++++++--
+ src/evdev-mt-touchpad.c          |  8 +++++++-
  src/evdev-mt-touchpad.h          |  5 +++++
- 3 files changed, 43 insertions(+), 2 deletions(-)
+ 4 files changed, 50 insertions(+), 3 deletions(-)
 
 diff --git a/src/evdev-mt-touchpad-buttons.c b/src/evdev-mt-touchpad-buttons.c
 index ab054799..fd79be75 100644
@@ -97,6 +107,26 @@ index 7482e3c1..8353d199 100644
  void
  tp_gesture_cancel_motion_gestures(struct tp_dispatch *tp, usec_t time)
  {
+diff --git a/src/evdev-mt-touchpad.c b/src/evdev-mt-touchpad.c
+index e33e0969..93e0b18e 100644
+--- a/src/evdev-mt-touchpad.c
++++ b/src/evdev-mt-touchpad.c
+@@ -1745,8 +1745,14 @@ tp_process_state(struct tp_dispatch *tp, usec_t time)
+ 	 * spurious pointer moves by the clicking finger we pin all fingers.
+ 	 * We unpin fingers when they move more then a certain threshold to
+ 	 * to allow drag and drop.
++	 *
++	 * Don't pin while a gesture is in progress: pinned touches count as
++	 * inactive for gestures, so pinning here would drop every touch out
++	 * of the gesture and cancel the in-progress swipe/pinch/3fg-drag.
++	 * The click is swallowed instead (see tp_notify_clickpadbutton()).
+ 	 */
+-	if ((tp->queued & TOUCHPAD_EVENT_BUTTON_PRESS) && tp->buttons.is_clickpad)
++	if ((tp->queued & TOUCHPAD_EVENT_BUTTON_PRESS) && tp->buttons.is_clickpad &&
++	    !tp_gesture_is_in_progress(tp))
+ 		tp_pin_fingers(tp);
+ 
+ 	tp_gesture_update_finger_state(tp, time);
 diff --git a/src/evdev-mt-touchpad.h b/src/evdev-mt-touchpad.h
 index 544cf467..979cdf12 100644
 --- a/src/evdev-mt-touchpad.h
