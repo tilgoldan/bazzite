@@ -21,6 +21,8 @@ dnf5 -y config-manager setopt "terra.enabled=1" "terra-extras.enabled=1"
 
 # this installs a package from fedora repos
 dnf5 install -y --refresh ghostty
+dnf5 remove  -y ptyxis
+
 
 ### VS Code
 rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -98,7 +100,7 @@ dnf5 remove -y \
     meson ninja-build patch \
     libevdev-devel libwacom-devel mtdev-devel \
     systemd-devel \
-    lua-devel lua-libs
+    lua-devel
 
 dnf5 autoremove -y
 
